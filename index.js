@@ -1,22 +1,17 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const fs = require("fs");
-const path = require("path");
+const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcrypt");
 
 const app = express();
 const port = 3000;
 
 const SECRET_KEY = "mysecretkey";
-const UPLOAD_DIR = path.join(__dirname, "uploads");
+const SALT_ROUNDS = 10;
 
 app.use(express.json());
 
-const users = [
-  {
-    username: "ABC",
-    password: "ABC123",
-  },
-];
+const prisma = new PrismaClient();
 
 // auth middleare
 const authenticateToken = (req, res, next) => {
@@ -34,77 +29,195 @@ const authenticateToken = (req, res, next) => {
 
 //auth login/signup
 
-app.post("/login", (req, res) => {
+app.post("/signup", async (req, res) => {
   const { username, password } = req.body;
-  const user = users.find((user) => user.username == username);
 
-  if (username === user.username && password === user.password) {
-    const token = jwt.sign({ user }, SECRET_KEY, { expiresIn: "8h" });
-    res.json({ token });
+  if (!username && !password) {
+    res.status(400).send("username and password required");
   }
-  res.status(401).send("Invalid Credentials");
+
+  const existinguser = await prisma.user.findUnique({
+    where: {
+      username,
+    },
+  });
+
+  if (existinguser) {
+    return res.status(400).send("user already exists");
+  }
+
+  const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+  const user = await prisma.user.create({
+    data: {
+      username,
+      password: hashedPassword,
+    },
+  });
+
+  res.status(201).json({ msg: "User created!!", user });
 });
 
-app.post("/signup", (req, res) => {
+app.post("/login", async (req, res) => {
   const { username, password } = req.body;
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
 
-  users.push({
-    username,
-    password,
-  });
-  res.send("Sinup Successfully, No u can login with ur username and password");
+    if (user && (await bcrypt.compare(password, user.password))) {
+      const token = jwt.sign({ username }, SECRET_KEY, {
+        expiresIn: "8h",
+      });
+      res.json({ token });
+    }
+
+    res.status(401).send("Invalid Credentials");
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 // File sharing App
 
 //Creating file : POST
-app.post("/file", authenticateToken, (req, res) => {
+app.post("/file", authenticateToken, async (req, res) => {
   const { filename, content } = req.body;
-  const filepath = path.join(UPLOAD_DIR, filename);
-  fs.writeFile(filepath, content, (err) => {
-    if (err) {
-      return res.status(500).send("Error uploading file");
+  const username = req.user.username;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+
+    if (!user) {
+      res.status(404).send("User not found");
     }
-    res.send("File uploaded");
-  });
+
+    if (!filename && !content) {
+      res.status(404).send("filename and content required");
+    }
+
+    const file = await prisma.file.create({
+      data: {
+        filename,
+        content,
+        userId: user.id,
+      },
+    });
+
+    res.status(201).json(file);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 //Reading file : GET
-app.get("/file/:filename", authenticateToken, (req, res) => {
+app.get("/file/:filename", authenticateToken, async (req, res) => {
   const { filename } = req.params;
-  const filepath = path.join(UPLOAD_DIR, filename);
-  fs.readFile(filepath, "utf8", (err, data) => {
-    if (err) {
-      return res.status(500).send("File not found");
+  const username = req.user.username;
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+
+    if (!user) {
+      res.status(404).send("User not found");
     }
-    res.send(data);
-  });
+    if (!filename) {
+      res.status(403).send("filename required");
+    }
+    const file = await prisma.file.findFirst({
+      where: {
+        filename,
+      },
+    });
+    res.status(200).json(file);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 //Updating file :PUT
 
-app.put("/file/:filename", authenticateToken, (req, res) => {
-  const { filename } = req.params;
+app.put("/file/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
   const { content } = req.body;
-  const filepath = path.join(UPLOAD_DIR, filename);
-  fs.writeFile(filepath, content, (err) => {
-    if (err) {
-      return res.status(500).send("Error uploading file");
+  const username = req.user.username;
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+
+    if (!user) {
+      res.status(404).send("User not found");
     }
-    res.send("File uploaded");
-  });
+    if (!id && content) {
+      res.status(403).send("id and content required");
+    }
+
+    const file = await prisma.file.update({
+      where: {
+        id: parseInt(id),
+      },
+      data: {
+        content,
+      },
+    });
+    res.status(200).json(file);
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 //DELETing file : Delete
-app.delete("/file/:filename", authenticateToken, (req, res) => {
-  const { filename } = req.params;
-  const filepath = path.join(UPLOAD_DIR, filename);
-  fs.unlink(filepath, (err) => {
-    if (err) {
-      return res.status(500).send("Error deleting file");
+app.delete("/file/:id", authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const username = req.user.username;
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        username,
+      },
+    });
+
+    if (!user) {
+      res.status(404).send("User not found");
     }
-    res.send("File deleted!!");
-  });
+    if (!id) {
+      res.status(403).send("id");
+    }
+    const file = await prisma.file.delete({
+      where: {
+        id: parseInt(id),
+      },
+    });
+    if (!file) {
+      res.status(404).send("File not found");
+    }
+    res.send("File is Deleted");
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).send("Internal Server Error");
+  }
 });
 
 app.listen(port, () => {
