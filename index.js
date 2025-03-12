@@ -82,10 +82,22 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// delete user /user (delete req)
+/*1. DELETE Request for /user Route
+Create a DELETE request to delete a user. The request should include:
 
-// update user /user (put req)
+- Route: /user
+- Method: DELETE
+- Parameters: Id (unique identifier for the user to be deleted)
 
+
+2. PUT Request for /user Route
+Create a PUT request to update a user. The request should include:
+
+- Route: /user
+- Method: PUT
+- Parameters: Id (unique identifier for the user to be updated)
+- Request Body: updated user data username and password
+*/
 // File sharing App
 
 //Creating file : POST
