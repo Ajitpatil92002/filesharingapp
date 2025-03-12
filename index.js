@@ -82,6 +82,10 @@ app.post("/login", async (req, res) => {
   }
 });
 
+// delete user /user (delete req)
+
+// update user /user (put req)
+
 // File sharing App
 
 //Creating file : POST
