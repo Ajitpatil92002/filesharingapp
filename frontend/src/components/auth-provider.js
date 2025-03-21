@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
 
     const logout = () => {
         localStorage.removeItem('auth_token');
+        setToken(null);
         router.refresh();
     };
     if (!isLoaded) {

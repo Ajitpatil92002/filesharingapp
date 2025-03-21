@@ -148,7 +148,32 @@ app.post('/file', authenticateToken, async (req, res) => {
     }
 });
 
-//Reading file : GET
+//Reading files : GET
+app.get('/files', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: {
+                username,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).send('User not found');
+        }
+        const files = await prisma.file.findMany();
+        if (!files) {
+            return res.status(404).send('Files not found');
+        }
+        res.status(200).json(files);
+    } catch (error) {
+        console.error(error);
+
+        res.status(500).send('Internal Server Error');
+    }
+});
+
 app.get('/file/:filename', authenticateToken, async (req, res) => {
     const { filename } = req.params;
     const username = req.user.username;
@@ -186,7 +211,7 @@ app.get('/file/:filename', authenticateToken, async (req, res) => {
 
 app.put('/file/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
-    const { content } = req.body;
+    const { filename, content } = req.body;
     const username = req.user.username;
     try {
         const user = await prisma.user.findUnique({
@@ -208,6 +233,7 @@ app.put('/file/:id', authenticateToken, async (req, res) => {
                 id: parseInt(id),
             },
             data: {
+                filename,
                 content,
             },
         });

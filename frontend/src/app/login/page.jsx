@@ -17,6 +17,7 @@ import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
     const [username, setUsername] = useState('');
@@ -48,7 +49,7 @@ export default function LoginPage() {
                 const errorData = await response.text();
                 throw new Error(errorData || 'Failed to login');
             }
-            alert('Logedin sucessfully');
+            toast('Logedin sucessfully');
             const data = await response.json();
             login(data.token);
             router.push('/dashboard');
