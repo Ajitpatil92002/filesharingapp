@@ -152,6 +152,22 @@ app.post('/file', authenticateToken, async (req, res) => {
 app.get('/files', authenticateToken, async (req, res) => {
     const username = req.user.username;
 
+    let { pageno, perpage } = req.query;
+
+    if (!pageno || !perpage) {
+        pageno = 1;
+        perpage = 10;
+    }
+
+    // 1 - 10 -  0-10 items
+    // 2 - 10 -  11-20
+    //3 - 10  - 21 -30
+
+    let skip = (parseInt(pageno) - 1) * parseInt(perpage);
+
+    console.log(skip);
+    console.log(perpage);
+
     try {
         const user = await prisma.user.findUnique({
             where: {
@@ -162,11 +178,18 @@ app.get('/files', authenticateToken, async (req, res) => {
         if (!user) {
             return res.status(404).send('User not found');
         }
-        const files = await prisma.file.findMany();
+        const files = await prisma.file.findMany({
+            skip,
+            take: parseInt(perpage),
+        });
+        const filesCount = await prisma.file.count();
         if (!files) {
             return res.status(404).send('Files not found');
         }
-        res.status(200).json(files);
+        res.status(200).json({
+            files,
+            filesCount,
+        });
     } catch (error) {
         console.error(error);
 

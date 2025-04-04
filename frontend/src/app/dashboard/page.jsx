@@ -41,35 +41,49 @@ const Dashboardpage = () => {
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
     // Edit file states
-
     const [isFileDeleting, setIsFileDeleting] = useState(false);
+
+    const [pageno, setPageno] = useState(1);
+    const [perpage, setPerpage] = useState(2);
+    const [filesCount, setFilesCount] = useState(0);
 
     const router = useRouter();
 
-    const fetchFiles = useCallback(async () => {
-        setIsFilesLoading(true);
-        try {
-            const response = await fetch('http://localhost:3001/files', {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
+    let totalpages = Math.ceil(filesCount / perpage);
 
-            if (!response.ok) {
-                const errorData = await response.text();
-                throw new Error(errorData || 'Failed to fetch user');
+    const fetchFiles = useCallback(
+        async (pageno, perpage) => {
+            setIsFilesLoading(true);
+            try {
+                const response = await fetch(
+                    `http://localhost:3001/files/?pageno=${pageno}&perpage=${perpage}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.text();
+                    throw new Error(errorData || 'Failed to fetch user');
+                }
+
+                const { files, filesCount } = await response.json();
+                console.log(files);
+
+                setFiles(files);
+                setFilesCount(filesCount);
+            } catch (error) {
+                setError(error.message || 'Something went wrong');
+            } finally {
+                setIsFilesLoading(false);
             }
-
-            const files = await response.json();
-            setFiles(files);
-        } catch (error) {
-            setError(error.message || 'Something went wrong');
-        } finally {
-            setIsFilesLoading(false);
-        }
-    }, []);
+        },
+        [pageno, perpage]
+    );
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -95,7 +109,7 @@ const Dashboardpage = () => {
         };
         if (token) {
             fetchUser();
-            fetchFiles();
+            fetchFiles(pageno, perpage);
         } else {
             router.push('/login');
         }
@@ -185,6 +199,17 @@ const Dashboardpage = () => {
         }
     };
 
+    const handlePagination = async type => {
+        if (type == 'PREV') {
+            // setPageno(curr => (curr <= 0 ? 1 : curr - 1));
+            setPageno(pageno - 1);
+        } else {
+            // setPageno(curr => curr => totalpages ? 1 : curr + 1);
+            setPageno(pageno + 1);
+        }
+        await fetchFiles(pageno, perpage);
+    };
+
     return (
         <div className='container mx-auto '>
             <div className='p-5 bg-muted-foreground flex items-center justify-between rounded-3xl mt-2'>
@@ -197,6 +222,12 @@ const Dashboardpage = () => {
                     )}
                 </div>
                 <Button onClick={handleLogout}>Logout</Button>
+            </div>
+            <div className='flex items-center justify-between gap-4 mt-4'>
+                <div>cuu Page NO : {pageno}</div>
+                <div>Total Pages : {totalpages}</div>
+                <div>filesCount : {filesCount}</div>
+                <div>Perpage : {perpage}</div>
             </div>
             <main className='grid grid-cols-3 my-5 gap-4'>
                 <div className='col-span-3 flex items-center justify-end'>
@@ -405,6 +436,22 @@ const Dashboardpage = () => {
                     </DialogContent>
                 </Dialog>
             </main>
+            <footer>
+                <div className='flex items-center justify-center gap-4'>
+                    <Button
+                        disabled={pageno <= totalpages}
+                        onClick={() => handlePagination('PREV')}
+                    >
+                        Prev
+                    </Button>
+                    <Button
+                        disabled={pageno >= totalpages}
+                        onClick={() => handlePagination('NEXT')}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </footer>
         </div>
     );
 };
