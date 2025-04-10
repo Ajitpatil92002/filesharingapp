@@ -197,26 +197,23 @@ app.get('/files', authenticateToken, async (req, res) => {
     }
 });
 
-app.get('/file/:filename', authenticateToken, async (req, res) => {
-    const { filename } = req.params;
-    const username = req.user.username;
+app.get('/file/:fileid', async (req, res) => {
+    const { fileid } = req.params;
 
     try {
-        const user = await prisma.user.findUnique({
-            where: {
-                username,
-            },
-        });
-
-        if (!user) {
-            return res.status(404).send('User not found');
-        }
-        if (!filename) {
-            return res.status(400).send('filename required');
+        if (!fileid) {
+            return res.status(400).send('fileid required');
         }
         const file = await prisma.file.findFirst({
             where: {
-                filename,
+                id: +fileid,
+            },
+            include: {
+                user: {
+                    select: {
+                        username: true,
+                    },
+                },
             },
         });
         if (!file) {

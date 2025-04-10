@@ -13,6 +13,7 @@ import {
 import { Dialog, DialogContent, DialogHeader } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/use-auth';
 import { EditIcon, Trash } from 'lucide-react';
 import { toast } from 'sonner';
@@ -82,7 +83,7 @@ const Dashboardpage = () => {
                 setIsFilesLoading(false);
             }
         },
-        [pageno, perpage]
+        [token]
     );
 
     useEffect(() => {
@@ -113,7 +114,7 @@ const Dashboardpage = () => {
         } else {
             router.push('/login');
         }
-    }, [token]);
+    }, [token, pageno, perpage]);
 
     const handleLogout = () => {
         logout();
@@ -135,7 +136,7 @@ const Dashboardpage = () => {
             });
             toast('New file added');
             setNewFile({ filename: '', content: '' });
-            await fetchFiles();
+            await fetchFiles(pageno, perpage);
             setIsAddDialogOpen(false);
         } catch (error) {
             setAddFileError('error: failed to add file');
@@ -162,7 +163,7 @@ const Dashboardpage = () => {
             );
             toast('file Saved');
             setEditFile({ id: '', filename: '', content: '' });
-            await fetchFiles();
+            await fetchFiles(pageno, perpage);
             setIsEditDialogOpen(false);
             setEditFileError('');
         } catch (error) {
@@ -189,7 +190,7 @@ const Dashboardpage = () => {
                     }
                 );
                 toast('file Deleted');
-                await fetchFiles();
+                await fetchFiles(pageno, perpage);
             }
         } catch (error) {
             console.log(error);
@@ -200,14 +201,11 @@ const Dashboardpage = () => {
     };
 
     const handlePagination = async type => {
-        if (type == 'PREV') {
-            // setPageno(curr => (curr <= 0 ? 1 : curr - 1));
-            setPageno(pageno - 1);
-        } else {
-            // setPageno(curr => curr => totalpages ? 1 : curr + 1);
-            setPageno(pageno + 1);
+        if (type === 'PREV' && pageno > 1) {
+            setPageno(prev => prev - 1);
+        } else if (type === 'NEXT' && pageno < totalpages) {
+            setPageno(prev => prev + 1);
         }
-        await fetchFiles(pageno, perpage);
     };
 
     return (
@@ -275,7 +273,7 @@ const Dashboardpage = () => {
                                                 <Label htmlFor='content'>
                                                     Content
                                                 </Label>
-                                                <Input
+                                                <Textarea
                                                     placeholder='content'
                                                     id='content'
                                                     type={'text'}
@@ -317,7 +315,10 @@ const Dashboardpage = () => {
                     ? files
                           .sort((a, b) => a.id - b.id)
                           .map(file => (
-                              <Card>
+                              <Card
+                                  onClick={() => router.push(`/${file.id}`)}
+                                  key={file.id}
+                              >
                                   <CardHeader
                                       className={
                                           'flex items-center justify-between'
@@ -326,7 +327,7 @@ const Dashboardpage = () => {
                                       <CardTitle>{file.filename}</CardTitle>
                                       <div className='flex items-center gap-2'>
                                           <Button
-                                              ariant='outline'
+                                              variant='outline'
                                               size='icon'
                                               onClick={() => {
                                                   setEditFile(file);
@@ -352,7 +353,7 @@ const Dashboardpage = () => {
                               </Card>
                           ))
                     : isFilesLoading
-                    ? 'file is loading.....'
+                    ? 'files are loading.....'
                     : 'Files not found'}
                 <Dialog
                     open={isEditDialogOpen}
@@ -398,7 +399,7 @@ const Dashboardpage = () => {
                                             <Label htmlFor='content'>
                                                 Content
                                             </Label>
-                                            <Input
+                                            <Textarea
                                                 placeholder='content'
                                                 id='content'
                                                 type={'text'}
@@ -439,7 +440,7 @@ const Dashboardpage = () => {
             <footer>
                 <div className='flex items-center justify-center gap-4'>
                     <Button
-                        disabled={pageno <= totalpages}
+                        disabled={pageno <= 1}
                         onClick={() => handlePagination('PREV')}
                     >
                         Prev
